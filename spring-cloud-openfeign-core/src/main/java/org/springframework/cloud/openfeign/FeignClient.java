@@ -48,7 +48,7 @@ public @interface FeignClient {
 	 * @return the name of the service with optional protocol prefix
 	 */
 	@AliasFor("name")
-	String value() default "";
+	String value() default ""; // name 和 value 两个属性等价，至少要配置一个
 
 	/**
 	 * This will be used as the bean name instead of name if present, but will not be used

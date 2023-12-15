@@ -31,6 +31,9 @@ import org.springframework.lang.Nullable;
  * @author Dave Syer
  * @author Matt King
  * @author Jasbir Singh
+ *
+ *
+// FeignContext 是一个为 Feign Client 创建所准备的上下文对象
  */
 public class FeignContext extends NamedContextFactory<FeignClientSpecification> {
 

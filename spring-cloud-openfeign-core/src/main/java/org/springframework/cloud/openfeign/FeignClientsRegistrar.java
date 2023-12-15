@@ -88,8 +88,8 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 		Assert.isTrue(!clazz.isInterface(), "Fallback factory must produce instances "
 				+ "of fallback classes that implement the interface annotated by @FeignClient");
 	}
-
-	static String getName(String name) {
+	// 从传入的服务名称中提取出主机名（host）
+	static String getName(String name) { // foo
 		if (!StringUtils.hasText(name)) {
 			return "";
 		}
@@ -98,7 +98,7 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 		try {
 			String url;
 			if (!name.startsWith("http://") && !name.startsWith("https://")) {
-				url = "http://" + name;
+				url = "http://" + name; // http://foo
 			}
 			else {
 				url = name;
@@ -147,21 +147,25 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 
 	@Override
 	public void registerBeanDefinitions(AnnotationMetadata metadata, BeanDefinitionRegistry registry) {
+		//注册全局配置，解析EnableFeignClients注解上配置的defaultConfiguration属性
 		registerDefaultConfiguration(metadata, registry);
+		//扫描指定的所有包名下的被@FeignClient注解注释的接口，将扫描出来的接口调用registerFeignClient方法注册到spring容器
 		registerFeignClients(metadata, registry);
 	}
-
-	private void registerDefaultConfiguration(AnnotationMetadata metadata, BeanDefinitionRegistry registry) {
+	// metadata:org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$TestConfiguration
+	private void registerDefaultConfiguration(AnnotationMetadata metadata, BeanDefinitionRegistry registry) { // org.springframework.beans.factory.support.DefaultListableBeanFactory
+		//解析EnableFeignClients属性
 		Map<String, Object> defaultAttrs = metadata.getAnnotationAttributes(EnableFeignClients.class.getName(), true);
 
 		if (defaultAttrs != null && defaultAttrs.containsKey("defaultConfiguration")) {
 			String name;
 			if (metadata.hasEnclosingClass()) {
-				name = "default." + metadata.getEnclosingClassName();
+				name = "default." + metadata.getEnclosingClassName(); // default.org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests
 			}
 			else {
-				name = "default." + metadata.getClassName();
+				name = "default." + metadata.getClassName(); //
 			}
+			//注册客户端配置
 			registerClientConfiguration(registry, name, defaultAttrs.get("defaultConfiguration"));
 		}
 	}
@@ -169,54 +173,57 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 	public void registerFeignClients(AnnotationMetadata metadata, BeanDefinitionRegistry registry) {
 
 		LinkedHashSet<BeanDefinition> candidateComponents = new LinkedHashSet<>();
+		// 扫描带有EnableFeignClients注解的类
 		Map<String, Object> attrs = metadata.getAnnotationAttributes(EnableFeignClients.class.getName());
+		// 获取@EnableFeignClients 中clients的值
 		final Class<?>[] clients = attrs == null ? null : (Class<?>[]) attrs.get("clients");
 		if (clients == null || clients.length == 0) {
 			ClassPathScanningCandidateComponentProvider scanner = getScanner();
 			scanner.setResourceLoader(this.resourceLoader);
 			scanner.addIncludeFilter(new AnnotationTypeFilter(FeignClient.class));
+			// 如果没有设置，则扫描的包路径为 @EnableFeignClients 注解所在的包
 			Set<String> basePackages = getBasePackages(metadata);
 			for (String basePackage : basePackages) {
 				candidateComponents.addAll(scanner.findCandidateComponents(basePackage));
 			}
 		}
 		else {
-			for (Class<?> clazz : clients) {
-				candidateComponents.add(new AnnotatedGenericBeanDefinition(clazz));
+			for (Class<?> clazz : clients) {  //设置了, clients属性，则使用注解属性来进行扫描注册
+				candidateComponents.add(new AnnotatedGenericBeanDefinition(clazz)); // clazz: interface org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient
 			}
 		}
-
+		//循环扫描注册
 		for (BeanDefinition candidateComponent : candidateComponents) {
 			if (candidateComponent instanceof AnnotatedBeanDefinition) {
 				// verify annotated class is an interface
-				AnnotatedBeanDefinition beanDefinition = (AnnotatedBeanDefinition) candidateComponent;
-				AnnotationMetadata annotationMetadata = beanDefinition.getMetadata();
+				AnnotatedBeanDefinition beanDefinition = (AnnotatedBeanDefinition) candidateComponent; // Generic bean: class [org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient]; scope=; abstract=false; lazyInit=null; autowireMode=0; dependencyCheck=0; autowireCandidate=true; primary=false; factoryBeanName=null; factoryMethodName=null; initMethodName=null; destroyMethodName=null
+				AnnotationMetadata annotationMetadata = beanDefinition.getMetadata(); // org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient
 				Assert.isTrue(annotationMetadata.isInterface(), "@FeignClient can only be specified on an interface");
 
 				Map<String, Object> attributes = annotationMetadata
 						.getAnnotationAttributes(FeignClient.class.getCanonicalName());
 
-				String name = getClientName(attributes);
+				String name = getClientName(attributes); // bar
+				//注册被调用客户端配置
 				registerClientConfiguration(registry, name, attributes.get("configuration"));
-
-				registerFeignClient(registry, annotationMetadata, attributes);
+				registerFeignClient(registry, annotationMetadata, attributes); //注册 FeignClient
 			}
 		}
 	}
-
+	// 注册 FeignClient，组装BeanDefinition，实质是一个FeignClientFactoryBean，然后注册到Spring IOC容器
 	private void registerFeignClient(BeanDefinitionRegistry registry, AnnotationMetadata annotationMetadata,
-			Map<String, Object> attributes) {
-		String className = annotationMetadata.getClassName();
-		Class clazz = ClassUtils.resolveClassName(className, null);
-		ConfigurableBeanFactory beanFactory = registry instanceof ConfigurableBeanFactory
+			Map<String, Object> attributes) { //DefaultListableBeanFactory、FooClient上的@FeignClient元数据，@FeignClient的所有属性[{configuration=[class org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooConfiguration], contextId=, decode404=false, fallback=void, fallbackFactory=void, name=foo, path=, primary=true, qualifier=, qualifiers=[], url=https://foo, value=foo}]
+		String className = annotationMetadata.getClassName(); // org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient
+		Class clazz = ClassUtils.resolveClassName(className, null); // interface org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient
+		ConfigurableBeanFactory beanFactory = registry instanceof ConfigurableBeanFactory // DefaultListableBeanFactory
 				? (ConfigurableBeanFactory) registry : null;
-		String contextId = getContextId(beanFactory, attributes);
-		String name = getName(attributes);
-		FeignClientFactoryBean factoryBean = new FeignClientFactoryBean();
-		factoryBean.setBeanFactory(beanFactory);
-		factoryBean.setName(name);
-		factoryBean.setContextId(contextId);
-		factoryBean.setType(clazz);
+		String contextId = getContextId(beanFactory, attributes); // foo
+		String name = getName(attributes); // foo
+		FeignClientFactoryBean factoryBean = new FeignClientFactoryBean(); //
+		factoryBean.setBeanFactory(beanFactory); //org.springframework.beans.factory.support.DefaultListableBeanFactory@352e787a: defining beans [org.springframework.boot.test.mock.mockito.MockitoPostProcessor$SpyPostProcessor,org.springframework.boot.test.mock.mockito.MockitoPostProcessor,org.springframework.context.annotation.internalConfigurationAnnotationProcessor,org.springframework.context.annotation.internalAutowiredAnnotationProcessor,org.springframework.context.annotation.internalCommonAnnotationProcessor,org.springframework.context.event.internalEventListenerProcessor,org.springframework.context.event.internalEventListenerFactory,feignClientDisabledFeaturesTests.TestConfiguration,org.springframework.boot.autoconfigure.internalCachingMetadataReaderFactory,org.springframework.boot.autoconfigure.AutoConfigurationPackages,org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor,org.springframework.boot.context.internalConfigurationPropertiesBinderFactory,org.springframework.boot.context.internalConfigurationPropertiesBinder,org.springframework.boot.context.properties.BoundConfigurationProperties,org.springframework.boot.context.properties.EnableConfigurationPropertiesRegistrar.methodValidationExcludeFilter,feign.client-org.springframework.cloud.openfeign.FeignClientProperties,default.org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests.FeignClientSpecification,foo.FeignClientSpecification]; root of factory hierarchy
+		factoryBean.setName(name); // foo
+		factoryBean.setContextId(contextId); // foo
+		factoryBean.setType(clazz); // interface org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient
 		factoryBean.setRefreshableClient(isClientRefreshEnabled());
 		BeanDefinitionBuilder definition = BeanDefinitionBuilder.genericBeanDefinition(clazz, () -> {
 			factoryBean.setUrl(getUrl(beanFactory, attributes));
@@ -234,30 +241,30 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 			}
 			return factoryBean.getObject();
 		});
-		definition.setAutowireMode(AbstractBeanDefinition.AUTOWIRE_BY_TYPE);
-		definition.setLazyInit(true);
+		definition.setAutowireMode(AbstractBeanDefinition.AUTOWIRE_BY_TYPE); // 通过类型注入
+		definition.setLazyInit(true); // 懒加载
 		validate(attributes);
-
+		// Generic bean: class [org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient]; scope=; abstract=false; lazyInit=true; autowireMode=2; dependencyCheck=0; autowireCandidate=true; primary=false; factoryBeanName=null; factoryMethodName=null; initMethodName=null; destroyMethodName=null
 		AbstractBeanDefinition beanDefinition = definition.getBeanDefinition();
-		beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, className);
-		beanDefinition.setAttribute("feignClientsRegistrarFactoryBean", factoryBean);
+		beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, className); // 设置指定属性值factoryBeanObjectType=org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient
+		beanDefinition.setAttribute("feignClientsRegistrarFactoryBean", factoryBean); // 同理：FeignClientFactoryBean{type=interface org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient, name='foo', url='null', path='null', decode404=false, inheritParentContext=true, applicationContext=null, beanFactory=org.springframework.beans.factory.support.DefaultListableBeanFactory@352e787a: defining beans [org.springframework.boot.test.mock.mockito.MockitoPostProcessor$SpyPostProcessor,org.springframework.boot.test.mock.mockito.MockitoPostProcessor,org.springframework.context.annotation.internalConfigurationAnnotationProcessor,org.springframework.context.annotation.internalAutowiredAnnotationProcessor,org.springframework.context.annotation.internalCommonAnnotationProcessor,org.springframework.context.event.internalEventListenerProcessor,org.springframework.context.event.internalEventListenerFactory,feignClientDisabledFeaturesTests.TestConfiguration,org.springframework.boot.autoconfigure.internalCachingMetadataReaderFactory,org.springframework.boot.autoconfigure.AutoConfigurationPackages,org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor,org.springframework.boot.context.internalConfigurationPropertiesBinderFactory,org.springframework.boot.context.internalConfigurationPropertiesBinder,org.springframework.boot.context.properties.BoundConfigurationProperties,org.springframework.boot.context.properties.EnableConfigurationPropertiesRegistrar.methodValidationExcludeFilter,feign.client-org.springframework.cloud.openfeign.FeignClientProperties,default.org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests.FeignClientSpecification,foo.FeignClientSpecification]; root of factory hierarchy, fallback=void, fallbackFactory=void}connectTimeoutMillis=10000}readTimeoutMillis=60000}followRedirects=truerefreshableClient=false}
 
 		// has a default, won't be null
 		boolean primary = (Boolean) attributes.get("primary");
 
 		beanDefinition.setPrimary(primary);
 
-		String[] qualifiers = getQualifiers(attributes);
+		String[] qualifiers = getQualifiers(attributes); // feignClient的指定名称
 		if (ObjectUtils.isEmpty(qualifiers)) {
-			qualifiers = new String[] { contextId + "FeignClient" };
+			qualifiers = new String[] { contextId + "FeignClient" }; // fooFeignClient
 		}
-
+		// 注册到IOC容器
 		BeanDefinitionHolder holder = new BeanDefinitionHolder(beanDefinition, className, qualifiers);
 		BeanDefinitionReaderUtils.registerBeanDefinition(holder, registry);
 
 		registerOptionsBeanDefinition(registry, contextId);
 	}
-
+	// {configuration=[class org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooConfiguration], contextId=, decode404=false, fallback=void, fallbackFactory=void, name=foo, path=, primary=true, qualifier=, qualifiers=[], url=https://foo, value=foo}
 	private void validate(Map<String, Object> attributes) {
 		AnnotationAttributes annotation = AnnotationAttributes.fromMap(attributes);
 		// This blows up if an aliased property is overspecified
@@ -270,7 +277,7 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 		return getName(null, attributes);
 	}
 
-	String getName(ConfigurableBeanFactory beanFactory, Map<String, Object> attributes) {
+	String getName(ConfigurableBeanFactory beanFactory, Map<String, Object> attributes) { //
 		String name = (String) attributes.get("serviceId");
 		if (!StringUtils.hasText(name)) {
 			name = (String) attributes.get("name");
@@ -291,24 +298,24 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 		contextId = resolve(beanFactory, contextId);
 		return getName(contextId);
 	}
-
+	// 解析配置值的方法，具体来说，它用于解析字符串中的占位符和表达式
 	private String resolve(ConfigurableBeanFactory beanFactory, String value) {
 		if (StringUtils.hasText(value)) {
-			if (beanFactory == null) {
+			if (beanFactory == null) { // 如果 beanFactory 为空，直接使用 environment 解析占位符
 				return this.environment.resolvePlaceholders(value);
 			}
-			BeanExpressionResolver resolver = beanFactory.getBeanExpressionResolver();
+			BeanExpressionResolver resolver = beanFactory.getBeanExpressionResolver(); // 获取 BeanExpressionResolver 和解析后的值
 			String resolved = beanFactory.resolveEmbeddedValue(value);
-			if (resolver == null) {
+			if (resolver == null) {  // 如果 resolver 为空，直接返回解析后的值
 				return resolved;
 			}
-			Object evaluateValue = resolver.evaluate(resolved, new BeanExpressionContext(beanFactory, null));
-			if (evaluateValue != null) {
+			Object evaluateValue = resolver.evaluate(resolved, new BeanExpressionContext(beanFactory, null)); // 使用 BeanExpressionResolver 解析表达式
+			if (evaluateValue != null) { // 如果解析结果不为空，将其转换为字符串返回；否则返回 null
 				return String.valueOf(evaluateValue);
 			}
 			return null;
 		}
-		return value;
+		return value;  // 如果传入的字符串为空，则直接返回原始值
 	}
 
 	private String getUrl(ConfigurableBeanFactory beanFactory, Map<String, Object> attributes) {
@@ -335,7 +342,7 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 			}
 		};
 	}
-
+	// 如果没有设置，则扫描的包路径为 @EnableFeignClients 注解所在的包
 	protected Set<String> getBasePackages(AnnotationMetadata importingClassMetadata) {
 		Map<String, Object> attributes = importingClassMetadata
 				.getAnnotationAttributes(EnableFeignClients.class.getCanonicalName());
@@ -371,20 +378,20 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 		}
 		return null;
 	}
-
+	// 从传入的客户端配置（client）中提取出限定符（qualifiers）
 	private String[] getQualifiers(Map<String, Object> client) {
 		if (client == null) {
 			return null;
 		}
 		List<String> qualifierList = new ArrayList<>(Arrays.asList((String[]) client.get("qualifiers")));
 		qualifierList.removeIf(qualifier -> !StringUtils.hasText(qualifier));
-		if (qualifierList.isEmpty() && getQualifier(client) != null) {
+		if (qualifierList.isEmpty() && getQualifier(client) != null) { // 如果限定符列表为空，但存在单个限定符，使用该单个限定符(qualifier)
 			qualifierList = Collections.singletonList(getQualifier(client));
 		}
 		return !qualifierList.isEmpty() ? qualifierList.toArray(new String[0]) : null;
 	}
-
-	private String getClientName(Map<String, Object> client) {
+	// 根据@FeignClient注解的属性来获取客户端名称
+	private String getClientName(Map<String, Object> client) {  // @FeignClient注解的属性
 		if (client == null) {
 			return null;
 		}
@@ -410,7 +417,7 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 		BeanDefinitionBuilder builder = BeanDefinitionBuilder.genericBeanDefinition(FeignClientSpecification.class);
 		builder.addConstructorArgValue(name);
 		builder.addConstructorArgValue(configuration);
-		registry.registerBeanDefinition(name + "." + FeignClientSpecification.class.getSimpleName(),
+		registry.registerBeanDefinition(name + "." + FeignClientSpecification.class.getSimpleName(), //default.org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests.FeignClientSpecification、
 				builder.getBeanDefinition());
 	}
 
@@ -421,7 +428,7 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 
 	/**
 	 * This method is meant to create {@link Request.Options} beans definition with
-	 * refreshScope.
+	 * refreshScope.   用于配置 Feign 客户端选项的 bean 定义，以支持动态刷新
 	 * @param registry spring bean definition registry
 	 * @param contextId name of feign client
 	 */

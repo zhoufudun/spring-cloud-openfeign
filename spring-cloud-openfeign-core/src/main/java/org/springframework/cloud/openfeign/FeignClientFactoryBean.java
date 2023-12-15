@@ -79,23 +79,23 @@ public class FeignClientFactoryBean
 
 	private static Log LOG = LogFactory.getLog(FeignClientFactoryBean.class);
 
-	private Class<?> type;
+	private Class<?> type; // interface org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient
 
-	private String name;
+	private String name; // foo
 
-	private String url;
+	private String url; // https://foo
 
-	private String contextId;
+	private String contextId; // foo
 
 	private String path;
 
-	private boolean decode404;
+	private boolean decode404; // fasle
 
-	private boolean inheritParentContext = true;
+	private boolean inheritParentContext = true; // true
 
 	private ApplicationContext applicationContext;
 
-	private BeanFactory beanFactory;
+	private BeanFactory beanFactory; // org.springframework.beans.factory.support.DefaultListableBeanFactory
 
 	private Class<?> fallback = void.class;
 
@@ -124,10 +124,10 @@ public class FeignClientFactoryBean
 		// @formatter:off
 		Feign.Builder builder = get(context, Feign.Builder.class)
 				// required values
-				.logger(logger)
-				.encoder(get(context, Encoder.class))
-				.decoder(get(context, Decoder.class))
-				.contract(get(context, Contract.class));
+				.logger(logger) // //日志
+				.encoder(get(context, Encoder.class)) //编码器
+				.decoder(get(context, Decoder.class))  //解码器
+				.contract(get(context, Contract.class)); //验证器
 		// @formatter:on
 
 		configureFeign(context, builder);
@@ -335,9 +335,9 @@ public class FeignClientFactoryBean
 		}
 	}
 
-	protected <T> T get(FeignContext context, Class<T> type) {
-		T instance = context.getInstance(contextId, type);
-		if (instance == null) {
+	protected <T> T get(FeignContext context, Class<T> type) { // interface org.springframework.cloud.openfeign.FeignLoggerFactory
+		T instance = context.getInstance(contextId, type); //
+		if (instance == null) { //
 			throw new IllegalStateException("No bean found of type " + type + " for " + contextId);
 		}
 		return instance;
@@ -402,10 +402,12 @@ public class FeignClientFactoryBean
 	 * information
 	 */
 	<T> T getTarget() {
+		//实例化Feign上下文对象FeignContext
 		FeignContext context = beanFactory != null ? beanFactory.getBean(FeignContext.class)
 				: applicationContext.getBean(FeignContext.class);
+		//生成Builder对象，用来生成Feign
 		Feign.Builder builder = feign(context);
-
+		//如果url为空，则走负载均衡，生成有负载均衡功能的代理类
 		if (!StringUtils.hasText(url)) {
 
 			if (LOG.isInfoEnabled()) {
@@ -418,12 +420,14 @@ public class FeignClientFactoryBean
 				url = name;
 			}
 			url += cleanPath();
+			//@FeignClient没有配置url属性，返回有负载均衡功能的代理对象
 			return (T) loadBalance(builder, context, new HardCodedTarget<>(type, name, url));
 		}
+		//如果指定了url，则生成默认的代理类
 		if (StringUtils.hasText(url) && !url.startsWith("http")) {
 			url = "http://" + url;
 		}
-		String url = this.url + cleanPath();
+		String url = this.url + cleanPath(); // https://foo
 		Client client = getOptional(context, Client.class);
 		if (client != null) {
 			if (client instanceof FeignBlockingLoadBalancerClient) {
@@ -434,11 +438,12 @@ public class FeignClientFactoryBean
 			if (client instanceof RetryableFeignBlockingLoadBalancerClient) {
 				// not load balancing because we have a url,
 				// but Spring Cloud LoadBalancer is on the classpath, so unwrap
-				client = ((RetryableFeignBlockingLoadBalancerClient) client).getDelegate();
+				client = ((RetryableFeignBlockingLoadBalancerClient) client).getDelegate(); // ApacheHttpClient
 			}
 			builder.client(client);
 		}
 		Targeter targeter = get(context, Targeter.class);
+		//生成默认代理类
 		return (T) targeter.target(this, builder, context, new HardCodedTarget<>(type, name, url));
 	}
 
