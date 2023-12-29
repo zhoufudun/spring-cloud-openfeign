@@ -87,7 +87,7 @@ public class FeignClientFactoryBean
 
 	private String contextId; // foo
 
-	private String path;
+	private String path; // ""
 
 	private boolean decode404; // fasle
 
@@ -127,7 +127,7 @@ public class FeignClientFactoryBean
 				.logger(logger) // //日志
 				.encoder(get(context, Encoder.class)) //编码器
 				.decoder(get(context, Decoder.class))  //解码器
-				.contract(get(context, Contract.class)); //验证器
+				.contract(get(context, Contract.class)); //验证器, contract协议，用来实现模版解析
 		// @formatter:on
 
 		configureFeign(context, builder);
@@ -336,7 +336,7 @@ public class FeignClientFactoryBean
 	}
 
 	protected <T> T get(FeignContext context, Class<T> type) { // interface org.springframework.cloud.openfeign.FeignLoggerFactory
-		T instance = context.getInstance(contextId, type); //
+		T instance = context.getInstance(contextId, type); // defaultTargeter
 		if (instance == null) { //
 			throw new IllegalStateException("No bean found of type " + type + " for " + contextId);
 		}
@@ -366,6 +366,7 @@ public class FeignClientFactoryBean
 	}
 
 	protected <T> T loadBalance(Feign.Builder builder, FeignContext context, HardCodedTarget<T> target) {
+		// Feign发送请求以及接受响应的http client，默认是Client.Default的实现，可以修改成OkHttp、HttpClient等。
 		Client client = getOptional(context, Client.class);
 		if (client != null) {
 			builder.client(client);
@@ -403,6 +404,10 @@ public class FeignClientFactoryBean
 	 */
 	<T> T getTarget() {
 		//实例化Feign上下文对象FeignContext
+		/**
+		 * FeignContext是全局唯一的上下文，它继承了NamedContextFactory，
+		 * 它是用来来统一维护feign中各个feign客户端相互隔离的上下文，FeignContext注册到容器是在FeignAutoConfiguration上完成的
+		 */
 		FeignContext context = beanFactory != null ? beanFactory.getBean(FeignContext.class)
 				: applicationContext.getBean(FeignContext.class);
 		//生成Builder对象，用来生成Feign
@@ -423,12 +428,12 @@ public class FeignClientFactoryBean
 			//@FeignClient没有配置url属性，返回有负载均衡功能的代理对象
 			return (T) loadBalance(builder, context, new HardCodedTarget<>(type, name, url));
 		}
-		//如果指定了url，则生成默认的代理类
 		if (StringUtils.hasText(url) && !url.startsWith("http")) {
 			url = "http://" + url;
 		}
+		//如果指定了url，则生成默认的代理类
 		String url = this.url + cleanPath(); // https://foo
-		Client client = getOptional(context, Client.class);
+		Client client = getOptional(context, Client.class); // org.springframework.cloud.openfeign.loadbalancer.RetryableFeignBlockingLoadBalancerClient@795eddda
 		if (client != null) {
 			if (client instanceof FeignBlockingLoadBalancerClient) {
 				// not load balancing because we have a url,

@@ -103,6 +103,7 @@ public class FeignAutoConfiguration {
 	@Bean
 	public FeignContext feignContext() {
 		FeignContext context = new FeignContext();
+		// 在初始化FeignContext时，会把configurations放入到FeignContext中。configuration表示当前被扫描到的所有@FeignClient
 		context.setConfigurations(this.configurations);
 		return context;
 	}

@@ -210,6 +210,16 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 			}
 		}
 	}
+
+	/**
+	 * 创建一个BeanDefinitionBuilder。
+	 * 创建一个工厂Bean，并把从@FeignClient注解中解析的属性设置到这个FactoryBean中
+	 * 调用registerBeanDefinition注册到IOC容器中
+	 *
+	 * @param registry
+	 * @param annotationMetadata
+	 * @param attributes
+	 */
 	// 注册 FeignClient，组装BeanDefinition，实质是一个FeignClientFactoryBean，然后注册到Spring IOC容器
 	private void registerFeignClient(BeanDefinitionRegistry registry, AnnotationMetadata annotationMetadata,
 			Map<String, Object> attributes) { //DefaultListableBeanFactory、FooClient上的@FeignClient元数据，@FeignClient的所有属性[{configuration=[class org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooConfiguration], contextId=, decode404=false, fallback=void, fallbackFactory=void, name=foo, path=, primary=true, qualifier=, qualifiers=[], url=https://foo, value=foo}]
@@ -219,13 +229,16 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 				? (ConfigurableBeanFactory) registry : null;
 		String contextId = getContextId(beanFactory, attributes); // foo
 		String name = getName(attributes); // foo
+		//构建一个FeignClient FactoryBean，这个是工厂Bean。
 		FeignClientFactoryBean factoryBean = new FeignClientFactoryBean(); //
 		factoryBean.setBeanFactory(beanFactory); //org.springframework.beans.factory.support.DefaultListableBeanFactory@352e787a: defining beans [org.springframework.boot.test.mock.mockito.MockitoPostProcessor$SpyPostProcessor,org.springframework.boot.test.mock.mockito.MockitoPostProcessor,org.springframework.context.annotation.internalConfigurationAnnotationProcessor,org.springframework.context.annotation.internalAutowiredAnnotationProcessor,org.springframework.context.annotation.internalCommonAnnotationProcessor,org.springframework.context.event.internalEventListenerProcessor,org.springframework.context.event.internalEventListenerFactory,feignClientDisabledFeaturesTests.TestConfiguration,org.springframework.boot.autoconfigure.internalCachingMetadataReaderFactory,org.springframework.boot.autoconfigure.AutoConfigurationPackages,org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor,org.springframework.boot.context.internalConfigurationPropertiesBinderFactory,org.springframework.boot.context.internalConfigurationPropertiesBinder,org.springframework.boot.context.properties.BoundConfigurationProperties,org.springframework.boot.context.properties.EnableConfigurationPropertiesRegistrar.methodValidationExcludeFilter,feign.client-org.springframework.cloud.openfeign.FeignClientProperties,default.org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests.FeignClientSpecification,foo.FeignClientSpecification]; root of factory hierarchy
 		factoryBean.setName(name); // foo
 		factoryBean.setContextId(contextId); // foo
 		factoryBean.setType(clazz); // interface org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient
 		factoryBean.setRefreshableClient(isClientRefreshEnabled());
+		//BeanDefinitionBuilder是用来构建BeanDefinition对象的建造器
 		BeanDefinitionBuilder definition = BeanDefinitionBuilder.genericBeanDefinition(clazz, () -> {
+			//把@FeignClient注解配置中的属性设置到FactoryBean中。
 			factoryBean.setUrl(getUrl(beanFactory, attributes));
 			factoryBean.setPath(getPath(beanFactory, attributes));
 			factoryBean.setDecode404(Boolean.parseBoolean(String.valueOf(attributes.get("decode404"))));
@@ -239,17 +252,18 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 				factoryBean.setFallbackFactory(fallbackFactory instanceof Class ? (Class<?>) fallbackFactory
 						: ClassUtils.resolveClassName(fallbackFactory.toString(), null));
 			}
-			return factoryBean.getObject();
+			return factoryBean.getObject(); //factoryBean.getObject() ，基于工厂bean创造一个bean实例。
 		});
 		definition.setAutowireMode(AbstractBeanDefinition.AUTOWIRE_BY_TYPE); // 通过类型注入
 		definition.setLazyInit(true); // 懒加载
 		validate(attributes);
+		//从BeanDefinitionBuilder中构建一个BeanDefinition，它用来描述一个bean的实例定义
 		// Generic bean: class [org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient]; scope=; abstract=false; lazyInit=true; autowireMode=2; dependencyCheck=0; autowireCandidate=true; primary=false; factoryBeanName=null; factoryMethodName=null; initMethodName=null; destroyMethodName=null
 		AbstractBeanDefinition beanDefinition = definition.getBeanDefinition();
 		beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, className); // 设置指定属性值factoryBeanObjectType=org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient
 		beanDefinition.setAttribute("feignClientsRegistrarFactoryBean", factoryBean); // 同理：FeignClientFactoryBean{type=interface org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient, name='foo', url='null', path='null', decode404=false, inheritParentContext=true, applicationContext=null, beanFactory=org.springframework.beans.factory.support.DefaultListableBeanFactory@352e787a: defining beans [org.springframework.boot.test.mock.mockito.MockitoPostProcessor$SpyPostProcessor,org.springframework.boot.test.mock.mockito.MockitoPostProcessor,org.springframework.context.annotation.internalConfigurationAnnotationProcessor,org.springframework.context.annotation.internalAutowiredAnnotationProcessor,org.springframework.context.annotation.internalCommonAnnotationProcessor,org.springframework.context.event.internalEventListenerProcessor,org.springframework.context.event.internalEventListenerFactory,feignClientDisabledFeaturesTests.TestConfiguration,org.springframework.boot.autoconfigure.internalCachingMetadataReaderFactory,org.springframework.boot.autoconfigure.AutoConfigurationPackages,org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor,org.springframework.boot.context.internalConfigurationPropertiesBinderFactory,org.springframework.boot.context.internalConfigurationPropertiesBinder,org.springframework.boot.context.properties.BoundConfigurationProperties,org.springframework.boot.context.properties.EnableConfigurationPropertiesRegistrar.methodValidationExcludeFilter,feign.client-org.springframework.cloud.openfeign.FeignClientProperties,default.org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests.FeignClientSpecification,foo.FeignClientSpecification]; root of factory hierarchy, fallback=void, fallbackFactory=void}connectTimeoutMillis=10000}readTimeoutMillis=60000}followRedirects=truerefreshableClient=false}
 
-		// has a default, won't be null
+		// has a default, won't be null, 设置primary
 		boolean primary = (Boolean) attributes.get("primary");
 
 		beanDefinition.setPrimary(primary);
