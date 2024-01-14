@@ -197,6 +197,12 @@
 			<artifactId>spring-cloud-loadbalancer</artifactId>
 			<optional>true</optional>
 		</dependency>
+		<dependency>
+			<groupId>com.alibaba.boot</groupId>
+			<artifactId>nacos-discovery-spring-boot-starter</artifactId>
+			<version>0.2.12</version>
+		</dependency>
+
 	</dependencies>
 	<profiles>
 		<profile>

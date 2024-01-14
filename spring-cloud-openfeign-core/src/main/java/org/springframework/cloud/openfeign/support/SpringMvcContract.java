@@ -171,13 +171,23 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 		this.resourceLoader = resourceLoader;
 	}
 
+	/**
+	 * 通过 findMergedAnnotation 方法查找类上的合并注解 @RequestMapping。
+	 * 如果找到 @RequestMapping 注解，表示在 @FeignClient 接口上使用了不允许的注解，将抛出异常并输出错误信息
+	 *
+	 * @param data metadata collected so far relating to the current java method.
+	 * @param clz the class to process
+	 */
 	@Override
 	protected void processAnnotationOnClass(MethodMetadata data, Class<?> clz) {
+		// 查找类上的合并注解 @RequestMapping
 		RequestMapping classAnnotation = findMergedAnnotation(clz, RequestMapping.class);
+
+		// 如果找到 @RequestMapping 注解，抛出异常，不允许在 @FeignClient 接口上使用 @RequestMapping 注解
 		if (classAnnotation != null) {
-			LOG.error("Cannot process class: " + clz.getName()
-					+ ". @RequestMapping annotation is not allowed on @FeignClient interfaces.");
-			throw new IllegalArgumentException("@RequestMapping annotation not allowed on @FeignClient interfaces");
+			LOG.error("无法处理类：" + clz.getName()
+				+ "。@FeignClient 接口上不允许使用 @RequestMapping 注解。");
+			throw new IllegalArgumentException("@FeignClient 接口上不允许使用 @RequestMapping 注解");
 		}
 	}
 
@@ -187,60 +197,93 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 		return super.parseAndValidateMetadata(targetType, method);
 	}
 
+	/**
+	 * 简要解释：
+	 * 该方法用于处理在 Feign 客户端接口方法上的注解，包括 CollectionFormat、RequestMapping 等。
+	 * 解析集合格式、HTTP 方法、路径、produces、consumes、headers 等属性，并将解析结果存储在 MethodMetadata 中。
+	 * 最终生成 Feign 客户端方法的模板信息
+	 *
+	 * @param data metadata collected so far relating to the current java method.
+	 * @param methodAnnotation annotations present on the current method annotation.
+	 * @param method method currently being processed.
+	 */
 	@Override
 	protected void processAnnotationOnMethod(MethodMetadata data, Annotation methodAnnotation, Method method) {
-		if (CollectionFormat.class.isInstance(methodAnnotation)) {
+		// 如果注解类型是 CollectionFormat，处理集合格式
+		if (CollectionFormat.class.isInstance(methodAnnotation)) { // @org.springframework.web.bind.annotation.GetMapping(path=[], headers=[], name=, produces=[], params=[], value=[/hello], consumes=[])
 			CollectionFormat collectionFormat = findMergedAnnotation(method, CollectionFormat.class);
 			data.template().collectionFormat(collectionFormat.value());
 		}
 
+		// 如果注解不是 RequestMapping，且注解类型上没有 RequestMapping 注解，则直接返回
 		if (!RequestMapping.class.isInstance(methodAnnotation)
-				&& !methodAnnotation.annotationType().isAnnotationPresent(RequestMapping.class)) {
+			&& !methodAnnotation.annotationType().isAnnotationPresent(RequestMapping.class)) {
 			return;
 		}
 
+		// 查找方法上合并的 RequestMapping 注解
 		RequestMapping methodMapping = findMergedAnnotation(method, RequestMapping.class);
-		// HTTP Method
+
+		// 解析 HTTP 方法
 		RequestMethod[] methods = methodMapping.method();
 		if (methods.length == 0) {
-			methods = new RequestMethod[] { RequestMethod.GET };
+			methods = new RequestMethod[]{RequestMethod.GET};
 		}
 		checkOne(method, methods, "method");
 		data.template().method(Request.HttpMethod.valueOf(methods[0].name()));
 
-		// path
+		// 解析路径
 		checkAtMostOne(method, methodMapping.value(), "value");
 		if (methodMapping.value().length > 0) {
 			String pathValue = emptyToNull(methodMapping.value()[0]);
 			if (pathValue != null) {
-				pathValue = resolve(pathValue);
-				// Append path from @RequestMapping if value is present on method
+				pathValue = resolve(pathValue); // /hello
+
+				// 如果方法上的路径值存在，将其添加到模板路径中
 				if (!pathValue.startsWith("/") && !data.template().path().endsWith("/")) {
-					pathValue = "/" + pathValue;
+					pathValue = "/" + pathValue; // /hello
 				}
+
 				data.template().uri(pathValue, true);
+
+				// 处理是否解码斜杠的配置
 				if (data.template().decodeSlash() != decodeSlash) {
 					data.template().decodeSlash(decodeSlash);
 				}
 			}
 		}
 
-		// produces
+		// 解析 produces 属性
 		parseProduces(data, method, methodMapping);
 
-		// consumes
+		// 解析 consumes 属性
 		parseConsumes(data, method, methodMapping);
 
-		// headers
+		// 解析 headers 属性
 		parseHeaders(data, method, methodMapping);
 
+		// 初始化索引到扩展器的映射
 		data.indexToExpander(new LinkedHashMap<>());
 	}
 
+	/**
+	 * 简要解释：
+	 *
+	 * resolve 方法用于解析字符串中的占位符。
+	 * 首先，检查字符串是否非空且包含文本。
+	 * 然后，检查资源加载器是否是可配置的应用上下文类型。
+	 * 如果满足条件，使用应用上下文的环境对象解析占位符，返回解析后的值。
+	 * 如果不满足解析条件，直接返回原始值
+	 * @param value
+	 * @return
+	 */
 	private String resolve(String value) {
+		// 检查字符串是否非空且包含文本
 		if (StringUtils.hasText(value) && resourceLoader instanceof ConfigurableApplicationContext) {
+			// 如果字符串非空且资源加载器是可配置的应用上下文类型，则使用环境对象解析占位符
 			return ((ConfigurableApplicationContext) resourceLoader).getEnvironment().resolvePlaceholders(value);
 		}
+		// 如果不满足解析条件，直接返回原始值
 		return value;
 	}
 
@@ -255,29 +298,55 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 				method.getName(), fieldName, values == null ? null : Arrays.asList(values));
 	}
 
+	/**
+	 * 简要解释：
+	 *
+	 * 该方法用于处理方法参数上的注解，包括处理参数注解的合成、调用对应的处理器进行处理等。
+	 * 遍历参数上的注解，获取注解类型对应的处理器，并调用处理器进行处理。
+	 * 在处理注解时，会对参数注解进行合成处理，处理 @AliasFor，并在缺少 String #value() 时回退到参数名称。
+	 * 如果不是上传文件类型，存在 HTTP 相关的注解，并且参数索引对应的扩展器为空，则尝试获取对应的 Param.Expander，并将其添加到索引中
+	 *
+	 * @param data metadata collected so far relating to the current java method.
+	 * @param annotations annotations present on the current parameter annotation.
+	 * @param paramIndex if you find a name in {@code annotations}, call
+	 *        {@link #nameParam(MethodMetadata, String, int)} with this as the last parameter.
+	 * @return
+	 */
 	@Override
 	protected boolean processAnnotationsOnParameter(MethodMetadata data, Annotation[] annotations, int paramIndex) {
 		boolean isHttpAnnotation = false;
 
+		// 创建 AnnotatedParameterContext 对象，用于处理参数上的注解
 		AnnotatedParameterProcessor.AnnotatedParameterContext context = new SimpleAnnotatedParameterContext(data,
-				paramIndex);
+			paramIndex);
+
+		// 获取当前方法
 		Method method = processedMethods.get(data.configKey());
+
+		// 遍历参数上的注解
 		for (Annotation parameterAnnotation : annotations) {
+			// 获取参数注解对应的 AnnotatedParameterProcessor 处理器
 			AnnotatedParameterProcessor processor = annotatedArgumentProcessors
-					.get(parameterAnnotation.annotationType());
+				.get(parameterAnnotation.annotationType());
+
+			// 如果处理器存在，则处理参数注解
 			if (processor != null) {
 				Annotation processParameterAnnotation;
-				// synthesize, handling @AliasFor, while falling back to parameter name on
-				// missing String #value():
+				// 合成处理参数注解，处理 @AliasFor，并在缺少 String #value() 时回退到参数名称
 				processParameterAnnotation = synthesizeWithMethodParameterNameAsFallbackValue(parameterAnnotation,
-						method, paramIndex);
+					method, paramIndex);
 				isHttpAnnotation |= processor.processArgument(context, processParameterAnnotation, method);
 			}
 		}
 
+		// 如果不是上传文件类型，且存在 HTTP 相关的注解，并且参数索引对应的扩展器为空
 		if (!isMultipartFormData(data) && isHttpAnnotation && data.indexToExpander().get(paramIndex) == null) {
+			// 创建参数类型描述符
 			TypeDescriptor typeDescriptor = createTypeDescriptor(method, paramIndex);
+
+			// 判断是否可以进行类型转换为字符串
 			if (conversionService.canConvert(typeDescriptor, STRING_TYPE_DESCRIPTOR)) {
+				// 获取对应的 Param.Expander，并将其添加到索引中
 				Param.Expander expander = convertingExpanderFactory.getExpander(typeDescriptor);
 				if (expander != null) {
 					data.indexToExpander().put(paramIndex, expander);
@@ -286,6 +355,7 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 		}
 		return isHttpAnnotation;
 	}
+
 
 	private void parseProduces(MethodMetadata md, Method method, RequestMapping annotation) {
 		String[] serverProduces = annotation.produces();

@@ -51,63 +51,69 @@ import static org.springframework.cloud.openfeign.loadbalancer.LoadBalancerUtils
  * @author Olga Maciaszek-Sharma
  * @since 2.2.0
  */
-@SuppressWarnings({ "unchecked", "rawtypes" })
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class FeignBlockingLoadBalancerClient implements Client {
 
 	private static final Log LOG = LogFactory.getLog(FeignBlockingLoadBalancerClient.class);
 
-	private final Client delegate;
+	private final Client delegate;// feign.httpclient.ApacheHttpClient@7676b2b9
 
-	private final LoadBalancerClient loadBalancerClient;
+	private final LoadBalancerClient loadBalancerClient; // org.springframework.cloud.loadbalancer.blocking.client.BlockingLoadBalancerClient
 
 	private final LoadBalancerProperties properties;
 
 	private final LoadBalancerClientFactory loadBalancerClientFactory;
 
 	public FeignBlockingLoadBalancerClient(Client delegate, LoadBalancerClient loadBalancerClient,
-			LoadBalancerProperties properties, LoadBalancerClientFactory loadBalancerClientFactory) {
+										   LoadBalancerProperties properties, LoadBalancerClientFactory loadBalancerClientFactory) {
 		this.delegate = delegate;
 		this.loadBalancerClient = loadBalancerClient;
 		this.properties = properties;
 		this.loadBalancerClientFactory = loadBalancerClientFactory;
 	}
 
+	/**
+	 * @param request GET http://mockname/loadbalancerhello HTTP/1.1
+	 *                <p>
+	 *                Binary data
+	 * @param options options to apply to this request.
+	 * @return
+	 * @throws IOException
+	 */
 	@Override
-	public Response execute(Request request, Request.Options options) throws IOException {
-		final URI originalUri = URI.create(request.url());
-		String serviceId = originalUri.getHost();
+	public Response execute(Request request, Request.Options options) throws IOException { // request=
+		final URI originalUri = URI.create(request.url()); // http://mockname/loadbalancerhello
+		String serviceId = originalUri.getHost(); // mockname
 		Assert.state(serviceId != null, "Request URI does not contain a valid hostname: " + originalUri);
 		String hint = getHint(serviceId);
-		DefaultRequest<RequestDataContext> lbRequest = new DefaultRequest<>(
-				new RequestDataContext(buildRequestData(request), hint));
+		DefaultRequest<RequestDataContext> lbRequest = new DefaultRequest<>( // [DefaultRequest@299ddfff context = [RequestDataContext@fe09374 clientRequest = [RequestData@5862dda4 httpMethod = GET, url = http://mockname/loadbalancerhello, headers = map[[empty]], cookies = [null]]]]
+			new RequestDataContext(buildRequestData(request), hint));
 		Set<LoadBalancerLifecycle> supportedLifecycleProcessors = LoadBalancerLifecycleValidator
-				.getSupportedLifecycleProcessors(
-						loadBalancerClientFactory.getInstances(serviceId, LoadBalancerLifecycle.class),
-						RequestDataContext.class, ResponseData.class, ServiceInstance.class);
+			.getSupportedLifecycleProcessors(loadBalancerClientFactory.getInstances(serviceId, LoadBalancerLifecycle.class), RequestDataContext.class, ResponseData.class, ServiceInstance.class);
 		supportedLifecycleProcessors.forEach(lifecycle -> lifecycle.onStart(lbRequest));
 		ServiceInstance instance = loadBalancerClient.choose(serviceId, lbRequest);
 		org.springframework.cloud.client.loadbalancer.Response<ServiceInstance> lbResponse = new DefaultResponse(
-				instance);
+			instance);
 		if (instance == null) {
 			String message = "Load balancer does not contain an instance for the service " + serviceId;
 			if (LOG.isWarnEnabled()) {
 				LOG.warn(message);
 			}
 			supportedLifecycleProcessors.forEach(lifecycle -> lifecycle
-					.onComplete(new CompletionContext<ResponseData, ServiceInstance, RequestDataContext>(
-							CompletionContext.Status.DISCARD, lbRequest, lbResponse)));
+				.onComplete(new CompletionContext<ResponseData, ServiceInstance, RequestDataContext>(
+					CompletionContext.Status.DISCARD, lbRequest, lbResponse)));
 			return Response.builder().request(request).status(HttpStatus.SERVICE_UNAVAILABLE.value())
-					.body(message, StandardCharsets.UTF_8).build();
+				.body(message, StandardCharsets.UTF_8).build();
 		}
 		String reconstructedUrl = loadBalancerClient.reconstructURI(instance, originalUri).toString();
 		Request newRequest = buildRequest(request, reconstructedUrl);
 		return executeWithLoadBalancerLifecycleProcessing(delegate, options, newRequest, lbRequest, lbResponse,
-				supportedLifecycleProcessors);
+			supportedLifecycleProcessors);
 	}
 
 	protected Request buildRequest(Request request, String reconstructedUrl) {
 		return Request.create(request.httpMethod(), reconstructedUrl, request.headers(), request.body(),
-				request.charset(), request.requestTemplate());
+			request.charset(), request.requestTemplate());
 	}
 
 	// Visible for Sleuth instrumentation

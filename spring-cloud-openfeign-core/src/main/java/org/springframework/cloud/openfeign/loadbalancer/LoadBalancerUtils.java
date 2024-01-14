@@ -77,7 +77,7 @@ final class LoadBalancerUtils {
 				buildRequestData(response.request()));
 	}
 
-	static RequestData buildRequestData(Request request) {
+	static RequestData buildRequestData(Request request) { //  GET http://mockname/loadbalancerhello HTTP/1.1  \n\n Binary data
 		HttpHeaders requestHeaders = new HttpHeaders();
 		request.headers().forEach((key, value) -> requestHeaders.put(key, new ArrayList<>(value)));
 		return new RequestData(HttpMethod.resolve(request.httpMethod().name()), URI.create(request.url()),

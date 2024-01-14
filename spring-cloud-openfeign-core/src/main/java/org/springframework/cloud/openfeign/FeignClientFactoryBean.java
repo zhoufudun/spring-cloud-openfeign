@@ -79,7 +79,8 @@ public class FeignClientFactoryBean
 
 	private static Log LOG = LogFactory.getLog(FeignClientFactoryBean.class);
 
-	private Class<?> type; // interface org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient
+	private Class<?> type; // interface
+							// org.springframework.cloud.openfeign.FeignClientDisabledFeaturesTests$FooClient
 
 	private String name; // foo
 
@@ -116,57 +117,78 @@ public class FeignClientFactoryBean
 		Assert.hasText(contextId, "Context id must be set");
 		Assert.hasText(name, "Name must be set");
 	}
-
+	// 用于创建和配置 Feign 客户端的构建器（Feign.Builder）的方法
 	protected Feign.Builder feign(FeignContext context) {
+		// 从 Feign 上下文中获取 FeignLoggerFactory 实例，并创建日志记录器
 		FeignLoggerFactory loggerFactory = get(context, FeignLoggerFactory.class);
 		Logger logger = loggerFactory.create(type);
 
-		// @formatter:off
+		// 从 Feign 上下文中获取 Feign.Builder 实例，并配置必需的值
 		Feign.Builder builder = get(context, Feign.Builder.class)
-				// required values
-				.logger(logger) // //日志
-				.encoder(get(context, Encoder.class)) //编码器
-				.decoder(get(context, Decoder.class))  //解码器
-				.contract(get(context, Contract.class)); //验证器, contract协议，用来实现模版解析
-		// @formatter:on
+			.logger(logger)  // 设置日志记录器
+			.encoder(get(context, Encoder.class))  // 设置编码器
+			.decoder(get(context, Decoder.class))  // 设置解码器
+			.contract(get(context, Contract.class)); // 设置验证器，用于实现模板解析
 
+		// 配置 Feign 客户端
 		configureFeign(context, builder);
+
+		// 应用自定义构建器
 		applyBuildCustomizers(context, builder);
 
 		return builder;
 	}
 
+	/**
+	 * 简要解释：
+	 *
+	 * 使用 Feign 上下文（FeignContext）通过 getInstances 方法获取特定类型（FeignBuilderCustomizer）的实例集合。
+	 * 如果存在这些实例，通过流处理按照排序顺序应用这些自定义定制器到 Feign 的构建器（Feign.Builder）上。
+	 * 最后，将额外的自定义定制器（additionalCustomizers）应用到 Feign 构建器上。
+	 * 总体来说，这段代码的目的是在 Feign 构建时，通过应用自定义定制器来修改或扩展 Feign 客户端的行为。这样的设计允许开发者在构建 Feign 客户端时灵活地定制和配置一些特定的行为。
+	 * @param context
+	 * @param builder
+	 */
 	private void applyBuildCustomizers(FeignContext context, Feign.Builder builder) {
-		Map<String, FeignBuilderCustomizer> customizerMap = context.getInstances(contextId,
-				FeignBuilderCustomizer.class);
+		// 从 Feign 上下文中获取 FeignBuilderCustomizer 实例的 Map
+		Map<String, FeignBuilderCustomizer> customizerMap = context.getInstances(contextId, FeignBuilderCustomizer.class);
 
+		// 如果存在自定义定制器的实例集合
 		if (customizerMap != null) {
+			// 获取实例集合中的所有值（FeignBuilderCustomizer 实例），并按照排序顺序应用这些定制器
 			customizerMap.values().stream().sorted(AnnotationAwareOrderComparator.INSTANCE)
-					.forEach(feignBuilderCustomizer -> feignBuilderCustomizer.customize(builder));
+				.forEach(feignBuilderCustomizer -> feignBuilderCustomizer.customize(builder));
 		}
+
+		// 应用额外的定制器（additionalCustomizers）
 		additionalCustomizers.forEach(customizer -> customizer.customize(builder));
 	}
 
 	protected void configureFeign(FeignContext context, Feign.Builder builder) {
+		// 从 BeanFactory 或者 ApplicationContext 获取 FeignClientProperties 实例
 		FeignClientProperties properties = beanFactory != null ? beanFactory.getBean(FeignClientProperties.class)
-				: applicationContext.getBean(FeignClientProperties.class);
+			: applicationContext.getBean(FeignClientProperties.class);
 
+		// 获取 FeignClientConfigurer 实例
 		FeignClientConfigurer feignClientConfigurer = getOptional(context, FeignClientConfigurer.class);
+
+		// 设置是否继承父上下文的配置
 		setInheritParentContext(feignClientConfigurer.inheritParentConfiguration());
 
+		// 如果 properties 不为空并且允许继承父上下文的配置
 		if (properties != null && inheritParentContext) {
+			// 根据配置的默认行为，按照不同的顺序进行配置
 			if (properties.isDefaultToProperties()) {
-				configureUsingConfiguration(context, builder);
+				configureUsingConfiguration(context, builder);  // 使用 Feign 配置
+				configureUsingProperties(properties.getConfig().get(properties.getDefaultConfig()), builder);  // 使用默认配置
+				configureUsingProperties(properties.getConfig().get(contextId), builder);  // 使用指定上下文的配置
+			} else {
 				configureUsingProperties(properties.getConfig().get(properties.getDefaultConfig()), builder);
 				configureUsingProperties(properties.getConfig().get(contextId), builder);
-			}
-			else {
-				configureUsingProperties(properties.getConfig().get(properties.getDefaultConfig()), builder);
-				configureUsingProperties(properties.getConfig().get(contextId), builder);
 				configureUsingConfiguration(context, builder);
 			}
-		}
-		else {
+		} else {
+			// 如果不允许继承父上下文的配置，则只使用 Feign 配置
 			configureUsingConfiguration(context, builder);
 		}
 	}
@@ -335,8 +357,9 @@ public class FeignClientFactoryBean
 		}
 	}
 
-	protected <T> T get(FeignContext context, Class<T> type) { // interface org.springframework.cloud.openfeign.FeignLoggerFactory
-		T instance = context.getInstance(contextId, type); // defaultTargeter
+	protected <T> T get(FeignContext context, Class<T> type) { // type=interface org.springframework.cloud.openfeign.Targeter
+
+		T instance = context.getInstance(contextId, type); //  instance=org.springframework.cloud.openfeign.FeignHttpClientUrlTests$TestConfig$1@6a3a56de
 		if (instance == null) { //
 			throw new IllegalStateException("No bean found of type " + type + " for " + contextId);
 		}
@@ -365,9 +388,9 @@ public class FeignClientFactoryBean
 		}
 	}
 
-	protected <T> T loadBalance(Feign.Builder builder, FeignContext context, HardCodedTarget<T> target) {
+	protected <T> T loadBalance(Feign.Builder builder, FeignContext context, HardCodedTarget<T> target) { // target=HardCodedTarget(type=LoadbalancerTest, name=mockname, url=http://mockname)
 		// Feign发送请求以及接受响应的http client，默认是Client.Default的实现，可以修改成OkHttp、HttpClient等。
-		Client client = getOptional(context, Client.class);
+		Client client = getOptional(context, Client.class); // org.springframework.cloud.openfeign.loadbalancer.FeignBlockingLoadBalancerClient@6e489bb8
 		if (client != null) {
 			builder.client(client);
 			Targeter targeter = get(context, Targeter.class);
@@ -403,17 +426,17 @@ public class FeignClientFactoryBean
 	 * information
 	 */
 	<T> T getTarget() {
-		//实例化Feign上下文对象FeignContext
+		// 实例化Feign上下文对象FeignContext
 		/**
 		 * FeignContext是全局唯一的上下文，它继承了NamedContextFactory，
 		 * 它是用来来统一维护feign中各个feign客户端相互隔离的上下文，FeignContext注册到容器是在FeignAutoConfiguration上完成的
 		 */
-		FeignContext context = beanFactory != null ? beanFactory.getBean(FeignContext.class)
+		FeignContext context = beanFactory != null ? beanFactory.getBean(FeignContext.class) // context=org.springframework.cloud.openfeign.FeignContext@20a4cba7
 				: applicationContext.getBean(FeignContext.class);
-		//生成Builder对象，用来生成Feign
+		// 生成Builder对象，用来生成Feign
 		Feign.Builder builder = feign(context);
-		//如果url为空，则走负载均衡，生成有负载均衡功能的代理类
-		if (!StringUtils.hasText(url)) {
+		// 如果url为空，则走负载均衡，生成有负载均衡功能的代理类
+		if (!StringUtils.hasText(url)) { // http://localhost:62122/path
 
 			if (LOG.isInfoEnabled()) {
 				LOG.info("For '" + name + "' URL not provided. Will try picking an instance via load-balancing.");
@@ -425,30 +448,30 @@ public class FeignClientFactoryBean
 				url = name;
 			}
 			url += cleanPath();
-			//@FeignClient没有配置url属性，返回有负载均衡功能的代理对象
+			// @FeignClient没有配置url属性，返回有负载均衡功能的代理对象
 			return (T) loadBalance(builder, context, new HardCodedTarget<>(type, name, url));
 		}
 		if (StringUtils.hasText(url) && !url.startsWith("http")) {
 			url = "http://" + url;
 		}
-		//如果指定了url，则生成默认的代理类
-		String url = this.url + cleanPath(); // https://foo
-		Client client = getOptional(context, Client.class); // org.springframework.cloud.openfeign.loadbalancer.RetryableFeignBlockingLoadBalancerClient@795eddda
+		// 如果指定了url，则生成默认的代理类
+		String url = this.url + cleanPath(); // http://localhost:62122/path
+		Client client = getOptional(context, Client.class); // org.springframework.cloud.openfeign.loadbalancer.RetryableFeignBlockingLoadBalancerClient
 		if (client != null) {
 			if (client instanceof FeignBlockingLoadBalancerClient) {
 				// not load balancing because we have a url,
-				// but Spring Cloud LoadBalancer is on the classpath, so unwrap
-				client = ((FeignBlockingLoadBalancerClient) client).getDelegate();
+				// but Spring Cloud LoadBalancer is on the classpath, so unwrap // 由于有指定 URL，不进行负载均衡，但 Spring Cloud LoadBalancer 在类路径中，因此进行解封装
+				client = ((FeignBlockingLoadBalancerClient) client).getDelegate(); // client=feign.httpclient.ApacheHttpClient
 			}
 			if (client instanceof RetryableFeignBlockingLoadBalancerClient) {
 				// not load balancing because we have a url,
-				// but Spring Cloud LoadBalancer is on the classpath, so unwrap
+				// but Spring Cloud LoadBalancer is on the classpath, so unwrap // 由于有指定 URL，不进行负载均衡，但 Spring Cloud LoadBalancer 在类路径中，因此进行解封装
 				client = ((RetryableFeignBlockingLoadBalancerClient) client).getDelegate(); // ApacheHttpClient
 			}
 			builder.client(client);
 		}
-		Targeter targeter = get(context, Targeter.class);
-		//生成默认代理类
+		Targeter targeter = get(context, Targeter.class); // org.springframework.cloud.openfeign.FeignHttpClientUrlTests$TestConfig$1@6a3a56de
+		// 生成默认代理类
 		return (T) targeter.target(this, builder, context, new HardCodedTarget<>(type, name, url));
 	}
 

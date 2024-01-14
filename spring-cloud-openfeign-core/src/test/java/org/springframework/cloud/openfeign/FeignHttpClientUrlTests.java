@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.test.NoSecurityConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -62,6 +63,9 @@ class FeignHttpClientUrlTests {
 	private UrlClient urlClient;
 
 	@Autowired
+	private LoadbalancerTest loadbalancerTest;
+
+	@Autowired
 	private BeanUrlClient beanClient;
 
 	@BeforeAll
@@ -81,6 +85,13 @@ class FeignHttpClientUrlTests {
 		Hello hello = urlClient.getHello();
 		assertThat(hello).as("hello was null").isNotNull();
 		assertThat(hello).as("first hello didn't match").isEqualTo(new Hello("hello world 1"));
+	}
+
+	@Test
+	void testLoadbalancer() throws InterruptedException {
+//		Thread.sleep(30000);
+		Hello hello = loadbalancerTest.loadbalancerGetHello();
+		System.out.println(hello);
 	}
 
 	@Test
@@ -106,6 +117,14 @@ class FeignHttpClientUrlTests {
 
 	}
 
+	@FeignClient(value = "mock-server-name")
+	protected interface LoadbalancerTest {
+
+		@GetMapping("/hello")
+		Hello loadbalancerGetHello();
+
+	}
+
 	@FeignClient(name = "beanappurl", url = "#{SERVER_URL}path")
 	protected interface BeanUrlClient {
 
@@ -125,27 +144,31 @@ class FeignHttpClientUrlTests {
 	@Configuration(proxyBeanMethods = false)
 	@EnableAutoConfiguration
 	@RestController
-	@EnableFeignClients(clients = { UrlClient.class, BeanUrlClient.class, BeanUrlClientNoProtocol.class })
+	@EnableFeignClients(clients = { LoadbalancerTest.class, UrlClient.class, BeanUrlClient.class, BeanUrlClientNoProtocol.class })
 	@Import(NoSecurityConfiguration.class)
 	protected static class TestConfig {
 
 		@GetMapping("/hello")
 		public Hello getHello() {
+			System.out.println("===============");
 			return new Hello("hello world 1");
 		}
 
 		@GetMapping("/path/hello")
 		public Hello getHelloWithPath() {
+			System.out.println("===============");
 			return getHello();
 		}
 
 		@Bean(name = "SERVER_URL")
 		public String serverUrl() {
+			System.out.println("===============");
 			return "http://localhost:" + port + "/";
 		}
 
 		@Bean(name = "SERVER_URL_NO_PROTOCOL")
 		public String serverUrlNoProtocol() {
+			System.out.println("===============");
 			return "localhost:" + port + "/";
 		}
 
@@ -154,7 +177,7 @@ class FeignHttpClientUrlTests {
 			return new Targeter() {
 				@Override
 				public <T> T target(FeignClientFactoryBean factory, Feign.Builder feign, FeignContext context,
-						Target.HardCodedTarget<T> target) {
+						Target.HardCodedTarget<T> target) { // HardCodedTarget(type=BeanUrlClientNoProtocol, name=beanappurlnoprotocol, url=http://localhost:62122/path)
 					Field field = ReflectionUtils.findField(Feign.Builder.class, "client");
 					ReflectionUtils.makeAccessible(field);
 					Client client = (Client) ReflectionUtils.getField(field, feign);
