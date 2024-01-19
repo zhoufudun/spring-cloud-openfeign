@@ -105,6 +105,7 @@ public class FeignBlockingLoadBalancerClient implements Client {
 			return Response.builder().request(request).status(HttpStatus.SERVICE_UNAVAILABLE.value())
 				.body(message, StandardCharsets.UTF_8).build();
 		}
+		// 将域名替换为真实的ip:port, 例如：http://10.22.78.252:8765/admin/insert_url?timestamp=1693566141&sign=fFIYKq/BlPzwcoOesqqR3pQDO9jhhtB5vPL%20GwYTbyk%3D&type=0&expire_ts=1790000000&complete_url=https%3A//blog.csdn.net/weixin_43582611/article/details/98889030
 		String reconstructedUrl = loadBalancerClient.reconstructURI(instance, originalUri).toString();
 		Request newRequest = buildRequest(request, reconstructedUrl);
 		return executeWithLoadBalancerLifecycleProcessing(delegate, options, newRequest, lbRequest, lbResponse,

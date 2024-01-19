@@ -57,7 +57,7 @@ public class FeignClientBuilderTests {
 	}
 
 	private static void assertFactoryBeanField(final FeignClientBuilder.Builder builder, final String fieldName,
-			final Object expectedValue) {
+											   final Object expectedValue) {
 		final Object value = getFactoryBeanField(builder, fieldName);
 		assertThat(value).as("Expected value for the field '" + fieldName + "':").isEqualTo(expectedValue);
 	}
@@ -65,10 +65,10 @@ public class FeignClientBuilderTests {
 	@SuppressWarnings("unchecked")
 	private static <T> T getFactoryBeanField(final FeignClientBuilder.Builder builder, final String fieldName) {
 		final Field factoryBeanField = ReflectionUtils.findField(FeignClientBuilder.Builder.class,
-				"feignClientFactoryBean");
+			"feignClientFactoryBean");
 		ReflectionUtils.makeAccessible(factoryBeanField);
 		final FeignClientFactoryBean factoryBean = (FeignClientFactoryBean) ReflectionUtils.getField(factoryBeanField,
-				builder);
+			builder);
 
 		final Field field = ReflectionUtils.findField(FeignClientFactoryBean.class, fieldName);
 		ReflectionUtils.makeAccessible(field);
@@ -88,7 +88,7 @@ public class FeignClientBuilderTests {
 			methodNames.add(method.getName());
 		}
 		methodNames.removeAll(Arrays.asList("annotationType", "value", "serviceId", "qualifier", "qualifiers",
-				"configuration", "primary", "equals", "hashCode", "toString"));
+			"configuration", "primary", "equals", "hashCode", "toString"));
 		Collections.sort(methodNames);
 		// If this safety check fails the Builder has to be updated.
 		// (1) Either a field was removed from the FeignClient annotation and so it has to
@@ -97,9 +97,12 @@ public class FeignClientBuilderTests {
 		// (2) Or a new field was added and the builder class has to be extended with this
 		// new field.
 		assertThat(methodNames).containsExactly("contextId", "decode404", "fallback", "fallbackFactory", "name", "path",
-				"url");
+			"url");
 	}
 
+	/**
+	 * read
+	 */
 	@Test
 	public void forType_preinitializedBuilder() {
 		// when:
@@ -123,7 +126,7 @@ public class FeignClientBuilderTests {
 	public void forType_allFieldsSetOnBuilder() {
 		// when:
 		final FeignClientBuilder.Builder builder = this.feignClientBuilder.forType(TestFeignClient.class, "TestClient")
-				.decode404(true).url("Url/").path("/Path").contextId("TestContext");
+			.decode404(true).url("Url/").path("/Path").contextId("TestContext");
 
 		// then:
 		assertFactoryBeanField(builder, "applicationContext", this.applicationContext);
@@ -142,8 +145,8 @@ public class FeignClientBuilderTests {
 	public void forType_clientFactoryBeanProvided() {
 		// when:
 		final FeignClientBuilder.Builder builder = this.feignClientBuilder
-				.forType(TestFeignClient.class, new FeignClientFactoryBean(), "TestClient").decode404(true)
-				.path("Path/").url("Url/").contextId("TestContext").customize(Feign.Builder::doNotCloseAfterDecode);
+			.forType(TestFeignClient.class, new FeignClientFactoryBean(), "TestClient").decode404(true)
+			.path("Path/").url("Url/").contextId("TestContext").customize(Feign.Builder::doNotCloseAfterDecode);
 
 		// then:
 		assertFactoryBeanField(builder, "applicationContext", this.applicationContext);
@@ -163,12 +166,12 @@ public class FeignClientBuilderTests {
 	public void forType_build() {
 		// given:
 		Mockito.when(this.applicationContext.getBean(FeignContext.class)).thenThrow(new ClosedFileSystemException()); // throw
-																														// an
-																														// unusual
-																														// exception
-																														// in
-																														// the
-																														// FeignClientFactoryBean
+		// an
+		// unusual
+		// exception
+		// in
+		// the
+		// FeignClientFactoryBean
 		final FeignClientBuilder.Builder builder = this.feignClientBuilder.forType(TestClient.class, "TestClient");
 
 		// expect: 'the build will fail right after calling build() with the mocked

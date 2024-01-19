@@ -177,10 +177,10 @@ class FeignHttpClientUrlTests {
 			return new Targeter() {
 				@Override
 				public <T> T target(FeignClientFactoryBean factory, Feign.Builder feign, FeignContext context,
-						Target.HardCodedTarget<T> target) { // HardCodedTarget(type=BeanUrlClientNoProtocol, name=beanappurlnoprotocol, url=http://localhost:62122/path)
-					Field field = ReflectionUtils.findField(Feign.Builder.class, "client");
+							Target.HardCodedTarget<T> target) { // HardCodedTarget(type=BeanUrlClientNoProtocol, name=beanappurlnoprotocol, url=http://localhost:27257/path)
+					Field field = ReflectionUtils.findField(Feign.Builder.class, "client"); // private feign.Client feign.Feign$Builder.client
 					ReflectionUtils.makeAccessible(field);
-					Client client = (Client) ReflectionUtils.getField(field, feign);
+					Client client = (Client) ReflectionUtils.getField(field, feign); // feign.httpclient.ApacheHttpClient@1d3546f9
 					if (target.name().equals("localappurl")) {
 						assertThat(client).isInstanceOf(ApacheHttpClient.class).as("client was wrong type");
 					}

@@ -97,7 +97,10 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 	private static final ParameterNameDiscoverer PARAMETER_NAME_DISCOVERER = new DefaultParameterNameDiscoverer();
 
 	private final Map<Class<? extends Annotation>, AnnotatedParameterProcessor> annotatedArgumentProcessors;
-
+	/**
+	 * key= BeanUrlClientNoProtocol#getHello()
+	 * value= public abstract org.springframework.cloud.openfeign.FeignHttpClientUrlTests$Hello org.springframework.cloud.openfeign.FeignHttpClientUrlTests$BeanUrlClientNoProtocol.getHello()
+	 */
 	private final Map<String, Method> processedMethods = new HashMap<>();
 
 	private final ConversionService conversionService;
@@ -179,10 +182,9 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 	 * @param clz the class to process
 	 */
 	@Override
-	protected void processAnnotationOnClass(MethodMetadata data, Class<?> clz) {
-		// 查找类上的合并注解 @RequestMapping
-		RequestMapping classAnnotation = findMergedAnnotation(clz, RequestMapping.class);
-
+	protected void processAnnotationOnClass(MethodMetadata data, Class<?> clz) { // clz=interface org.springframework.cloud.openfeign.FeignHttpClientUrlTests$BeanUrlClientNoProtocol
+			// 查找类上的合并注解 @RequestMapping
+		RequestMapping classAnnotation = findMergedAnnotation(clz, RequestMapping.class); // @FeignClient从不支持RequestMapping
 		// 如果找到 @RequestMapping 注解，抛出异常，不允许在 @FeignClient 接口上使用 @RequestMapping 注解
 		if (classAnnotation != null) {
 			LOG.error("无法处理类：" + clz.getName()
