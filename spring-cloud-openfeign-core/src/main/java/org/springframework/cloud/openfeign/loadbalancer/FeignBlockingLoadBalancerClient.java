@@ -51,7 +51,7 @@ import static org.springframework.cloud.openfeign.loadbalancer.LoadBalancerUtils
  * @author Olga Maciaszek-Sharma
  * @since 2.2.0
  */
-@SuppressWarnings({ "unchecked", "rawtypes" })
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class FeignBlockingLoadBalancerClient implements Client {
 
 	private static final Log LOG = LogFactory.getLog(FeignBlockingLoadBalancerClient.class);
@@ -68,14 +68,14 @@ public class FeignBlockingLoadBalancerClient implements Client {
 	 */
 	@Deprecated
 	public FeignBlockingLoadBalancerClient(Client delegate, LoadBalancerClient loadBalancerClient,
-			LoadBalancerProperties properties, LoadBalancerClientFactory loadBalancerClientFactory) {
+										   LoadBalancerProperties properties, LoadBalancerClientFactory loadBalancerClientFactory) {
 		this.delegate = delegate;
 		this.loadBalancerClient = loadBalancerClient;
 		this.loadBalancerClientFactory = loadBalancerClientFactory;
 	}
 
 	public FeignBlockingLoadBalancerClient(Client delegate, LoadBalancerClient loadBalancerClient,
-			LoadBalancerClientFactory loadBalancerClientFactory) {
+										   LoadBalancerClientFactory loadBalancerClientFactory) {
 		this.delegate = delegate;
 		this.loadBalancerClient = loadBalancerClient;
 		this.loadBalancerClientFactory = loadBalancerClientFactory;
@@ -88,36 +88,36 @@ public class FeignBlockingLoadBalancerClient implements Client {
 		Assert.state(serviceId != null, "Request URI does not contain a valid hostname: " + originalUri);
 		String hint = getHint(serviceId);
 		DefaultRequest<RequestDataContext> lbRequest = new DefaultRequest<>(
-				new RequestDataContext(buildRequestData(request), hint));
+			new RequestDataContext(buildRequestData(request), hint));
 		Set<LoadBalancerLifecycle> supportedLifecycleProcessors = LoadBalancerLifecycleValidator
-				.getSupportedLifecycleProcessors(
-						loadBalancerClientFactory.getInstances(serviceId, LoadBalancerLifecycle.class),
-						RequestDataContext.class, ResponseData.class, ServiceInstance.class);
+			.getSupportedLifecycleProcessors(
+				loadBalancerClientFactory.getInstances(serviceId, LoadBalancerLifecycle.class),
+				RequestDataContext.class, ResponseData.class, ServiceInstance.class);
 		supportedLifecycleProcessors.forEach(lifecycle -> lifecycle.onStart(lbRequest));
 		ServiceInstance instance = loadBalancerClient.choose(serviceId, lbRequest);
 		org.springframework.cloud.client.loadbalancer.Response<ServiceInstance> lbResponse = new DefaultResponse(
-				instance);
+			instance);
 		if (instance == null) {
 			String message = "Load balancer does not contain an instance for the service " + serviceId;
 			if (LOG.isWarnEnabled()) {
 				LOG.warn(message);
 			}
 			supportedLifecycleProcessors.forEach(lifecycle -> lifecycle
-					.onComplete(new CompletionContext<ResponseData, ServiceInstance, RequestDataContext>(
-							CompletionContext.Status.DISCARD, lbRequest, lbResponse)));
+				.onComplete(new CompletionContext<ResponseData, ServiceInstance, RequestDataContext>(
+					CompletionContext.Status.DISCARD, lbRequest, lbResponse)));
 			return Response.builder().request(request).status(HttpStatus.SERVICE_UNAVAILABLE.value())
-					.body(message, StandardCharsets.UTF_8).build();
+				.body(message, StandardCharsets.UTF_8).build();
 		}
 		String reconstructedUrl = loadBalancerClient.reconstructURI(instance, originalUri).toString();
 		Request newRequest = buildRequest(request, reconstructedUrl);
 		LoadBalancerProperties loadBalancerProperties = loadBalancerClientFactory.getProperties(serviceId);
 		return executeWithLoadBalancerLifecycleProcessing(delegate, options, newRequest, lbRequest, lbResponse,
-				supportedLifecycleProcessors, loadBalancerProperties.isUseRawStatusCodeInResponseData());
+			supportedLifecycleProcessors, loadBalancerProperties.isUseRawStatusCodeInResponseData());
 	}
 
 	protected Request buildRequest(Request request, String reconstructedUrl) {
 		return Request.create(request.httpMethod(), reconstructedUrl, request.headers(), request.body(),
-				request.charset(), request.requestTemplate());
+			request.charset(), request.requestTemplate());
 	}
 
 	// Visible for Sleuth instrumentation

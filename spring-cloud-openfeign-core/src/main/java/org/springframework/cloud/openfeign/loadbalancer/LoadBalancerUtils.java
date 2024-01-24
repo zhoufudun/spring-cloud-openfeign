@@ -88,6 +88,28 @@ final class LoadBalancerUtils {
 				requestHeaders, null, new HashMap<>());
 	}
 
+	/**
+	 *
+	 * @param feignClient okhttp3.OkHttpClient
+	 * @param options   超时时间相关配置：
+	 * @param feignRequest： 如下
+	 * POST http://10.22.78.252:8765/admin/insert_url?timestamp=1693566141&sign=fFIYKq/BlPzwcoOesqqR3pQDO9jhhtB5vPL%20GwYTbyk%3D&type=0&expire_ts=1790000000&complete_url=https%3A//blog.csdn.net/weixin_43582611/article/details/98889030 HTTP/1.1
+	 * Env: dev
+	 * Host-Address: 10.2.40.18
+	 * Ih-Origin: ihuman-admin-service
+	 *
+	 * Binary data
+	 *
+	 * @param lbRequest
+	 * [DefaultRequest@1859f533 context = [RequestDataContext@349a6ba5 clientRequest = [RequestData@49956653 httpMethod = POST,
+	 * url = http://ihuman-turl-service/admin/insert_url?timestamp=1693566141&sign=fFIYKq/BlPzwcoOesqqR3pQDO9jhhtB5vPL%20GwYTbyk%3D&type=0&expire_ts=1790000000&complete_url=https%3A//blog.csdn.net/weixin_43582611/article/details/98889030,
+	 * headers = map['Env' -> list['dev'], 'Host-Address' -> list['10.2.40.18'], 'Ih-Origin' -> list['ihuman-admin-service']], cookies = [null]]]]
+	 * @param lbResponse: [DefaultResponse@3666744a serviceInstance = com.alibaba.cloud.nacos.NacosServiceInstance@e48a7d0f]
+	 * @param supportedLifecycleProcessors
+	 * @param useRawStatusCodes: false
+	 * @return
+	 * @throws IOException
+	 */
 	static Response executeWithLoadBalancerLifecycleProcessing(Client feignClient, Request.Options options,
 			Request feignRequest, org.springframework.cloud.client.loadbalancer.Request lbRequest,
 			org.springframework.cloud.client.loadbalancer.Response<ServiceInstance> lbResponse,
